@@ -36,3 +36,11 @@ eda_results/
 *.log
 training_log.txt
 master_training_log.txt
+
+# --- Allow small summary results to be tracked (keep fold-level outputs ignored) ---
+!loso_results/aggregated_results.json
+!pls_results/aggregated_results.json
+!bidmc_results/*.csv
+!pls_results/
+!bidmc_results/
+!loso_results/

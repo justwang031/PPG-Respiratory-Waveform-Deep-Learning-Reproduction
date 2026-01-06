@@ -1,0 +1,30 @@
+{
+  "method": "PLS Baseline LOSO Cross-Validation",
+  "n_components": 26,
+  "n_folds": 42,
+  "aggregation": "median",
+  "timestamp": "2025-12-11 15:20:58",
+  "results": {
+    "waveform_mae": {
+      "median": 0.3550556219552172,
+      "mean": 0.348338916368039,
+      "std": 0.05961257408810604,
+      "min": 0.21104062814609026,
+      "max": 0.5069712042583635
+    },
+    "rr_error_bpm": {
+      "median": 0.0,
+      "mean": 4.0,
+      "std": 6.873051671980525,
+      "min": 0.0,
+      "max": 28.75
+    },
+    "duty_cycle_error": {
+      "median": 0.2863541666666667,
+      "mean": 0.2761259920634921,
+      "std": 0.140558828522893,
+      "min": 0.005624999999999991,
+      "max": 0.6493749999999999
+    }
+  }
+}
