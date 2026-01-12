@@ -10,13 +10,19 @@ Paper specification: "PLS was implemented with 26 degrees of freedom"
 Author: Zhantao Wang
 """
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import os
 import gc
 import json
 import time
 import traceback
 from datetime import datetime
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -24,7 +30,7 @@ from sklearn.cross_decomposition import PLSRegression
 from tqdm import tqdm
 
 # Reuse existing evaluation infrastructure from loso_eval.py
-from loso_eval import (
+from evaluation.loso_eval import (
     calculate_waveform_mae,
     calculate_rr_error_fft,
     calculate_duty_cycle_error,
@@ -375,6 +381,7 @@ def run_pls_loso_cross_validation():
 # ============================================================================
 
 if __name__ == "__main__":
+    os.chdir(ROOT)
     try:
         results = run_pls_loso_cross_validation()
 

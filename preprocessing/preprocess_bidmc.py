@@ -20,6 +20,11 @@ import numpy as np
 import torch
 from scipy import signal
 from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 class BIDMCPreprocessor:
@@ -261,6 +266,8 @@ class BIDMCPreprocessor:
 
 
 if __name__ == "__main__":
+    os.chdir(ROOT)
+
     # Initialize preprocessor
     preprocessor = BIDMCPreprocessor(
         raw_data_dir='raw_data_bidmc',

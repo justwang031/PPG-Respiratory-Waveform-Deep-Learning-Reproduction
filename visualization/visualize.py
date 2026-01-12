@@ -5,12 +5,19 @@ This script loads the trained model and creates visualizations of its prediction
 on random test samples, comparing PPG input, ground truth CO2, and predicted CO2.
 """
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import os
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import numpy as np
-from utils import CorrEncoder
+from core_model.utils import CorrEncoder
 
 
 # ============================================================================
@@ -263,4 +270,5 @@ def main():
 
 
 if __name__ == "__main__":
+    os.chdir(ROOT)
     main()

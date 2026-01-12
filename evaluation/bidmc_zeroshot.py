@@ -13,12 +13,19 @@ Key differences from LOSO evaluation:
 - No training or fine-tuning
 - Uses pre-trained capnobase_master.pth checkpoint
 - Evaluates on all 53 BIDMC subjects
-- Uses pre-windowed data (no sliding window inference needed)
-- Simplified evaluation: concatenate windows → calculate RR via FFT
+- Reconstructs continuous signals from pre-windowed data
+- Uses sliding window inference with overlap-add (stride=30, 90% overlap)
+- Evaluation metrics: Respiratory rate MAE on 30.6s and 60.6s windows
 
-Author: Deep Learning Engineer
-Date: 2025-12-12
+Author: Zhantao Wang
 """
+
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 import os
 import time
@@ -26,11 +33,12 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import scipy.signal
 import torch
 from tqdm import tqdm
 
-from utils import CorrEncoder, count_parameters
-from loso_eval import calculate_respiratory_rate_fft, seed_everything, get_device
+from core_model.utils import CorrEncoder, count_parameters
+from evaluation.loso_eval import calculate_respiratory_rate_fft, seed_everything, get_device, sliding_window_inference
 
 
 # ============================================================================
@@ -52,11 +60,23 @@ WINDOWS_PER_SUBJECT = 50
 WINDOW_SIZE = 288  # 9.6s at 30Hz
 SAMPLING_RATE = 30  # Hz
 
+# Sliding window inference parameters
+STRIDE = 30  # 1 second at 30Hz (90% overlap with window_size=288)
+
 # Inference batch size (for efficient GPU usage)
 BATCH_SIZE = 32
 
 # Reproducibility
 RANDOM_SEED = 42
+
+# Evaluation window sizes (matching paper specification)
+# Paper uses 30.6s and 60.6s windows for respiratory rate calculation
+# At 30Hz sampling rate:
+WINDOW_SHORT_SEC = 30.6  # 30.6 seconds
+SAMPLES_SHORT = 918      # 30.6s × 30Hz = 918 samples
+
+WINDOW_LONG_SEC = 60.6   # 60.6 seconds
+SAMPLES_LONG = 1818      # 60.6s × 30Hz = 1818 samples
 
 
 # ============================================================================
@@ -163,16 +183,67 @@ def load_pretrained_model(checkpoint_path, device):
 # Evaluation Logic
 # ============================================================================
 
+def compute_windowed_mae(pred, true, window_samples):
+    """
+    Calculate Mean Absolute Error for respiratory rate across non-overlapping windows.
+
+    This function splits continuous signals into fixed-size windows, applies detrending,
+    calculates respiratory rate via FFT for each window, and returns the mean error.
+
+    Args:
+        pred: Predicted continuous RESP signal [N_samples] (numpy array)
+        true: Ground truth continuous RESP signal [N_samples] (numpy array)
+        window_samples: Window size in samples (918 for 30.6s, 1818 for 60.6s)
+
+    Returns:
+        mae: Mean Absolute Error of respiratory rate in BPM across all windows
+    """
+    n_samples = len(pred)
+
+    # Calculate number of complete non-overlapping windows
+    num_windows = n_samples // window_samples
+
+    # If signal is too short for even one window, return NaN
+    if num_windows == 0:
+        return float('nan')
+
+    errors = []
+
+    for i in range(num_windows):
+        # Extract window
+        start_idx = i * window_samples
+        end_idx = start_idx + window_samples
+
+        pred_window = pred[start_idx:end_idx]
+        true_window = true[start_idx:end_idx]
+
+        # CRITICAL: Apply linear detrending to remove baseline drift
+        # This is essential for accurate FFT-based frequency estimation
+        pred_detrended = scipy.signal.detrend(pred_window, type='linear')
+        true_detrended = scipy.signal.detrend(true_window, type='linear')
+
+        # Calculate respiratory rate via FFT
+        rr_pred = calculate_respiratory_rate_fft(pred_detrended, fs=SAMPLING_RATE)
+        rr_true = calculate_respiratory_rate_fft(true_detrended, fs=SAMPLING_RATE)
+
+        # Compute absolute error for this window
+        error = abs(rr_pred - rr_true)
+        errors.append(error)
+
+    # Return mean error across all windows
+    return np.mean(errors)
+
+
 def evaluate_subject(model, subject_idx, ppg_windows, resp_windows, device):
     """
     Evaluate model on a single BIDMC subject.
 
-    Strategy (simplified from sliding window):
-    1. Pass 50 pre-windowed PPG samples through model
-    2. Flatten predictions: [50, 288] → [14400] pseudo-continuous signal
-    3. Flatten ground truth: [50, 288] → [14400] pseudo-continuous signal
-    4. Calculate respiratory rate using FFT on both signals
-    5. Compute absolute RR error
+    Strategy (using sliding window inference):
+    1. Flatten 50 pre-windowed PPG samples into continuous signal [14400]
+    2. Apply sliding window inference with overlap-add (stride=30, ~471 windows)
+    3. Flatten 50 ground truth RESP windows into continuous signal [14400]
+    4. Calculate respiratory rate MAE for 30.6s windows (918 samples)
+    5. Calculate respiratory rate MAE for 60.6s windows (1818 samples)
 
     Args:
         model: Pre-trained CorrEncoder in eval mode
@@ -182,44 +253,61 @@ def evaluate_subject(model, subject_idx, ppg_windows, resp_windows, device):
         device: Device to run inference on
 
     Returns:
-        Dict with evaluation metrics
+        Dict with evaluation metrics (subject_id, mae_30s, mae_60s)
     """
-    # Add channel dimension: [50, 288] → [50, 1, 288]
-    ppg_tensor = ppg_windows.unsqueeze(1).to(device)
+    # ========================================================================
+    # Step 1: Reconstruct Continuous Signals from Pre-windowed Data
+    # ========================================================================
+    # Input: ppg_windows [50, 288], resp_windows [50, 288]
+    # Output: continuous signals [14400] (50 * 288 samples = 480 seconds)
 
-    # Run inference in batches (more efficient for GPU)
-    predictions = []
-    with torch.no_grad():
-        for i in range(0, len(ppg_tensor), BATCH_SIZE):
-            batch = ppg_tensor[i:i+BATCH_SIZE]
-            pred = model(batch)  # [batch_size, 1, 288]
-            predictions.append(pred.cpu())
-
-    # Concatenate batches: [50, 1, 288]
-    predictions = torch.cat(predictions, dim=0)
-
-    # Remove channel dimension: [50, 1, 288] → [50, 288]
-    predictions = predictions.squeeze(1)
-
-    # Flatten to pseudo-continuous signals: [50, 288] → [14400]
-    pred_continuous = predictions.reshape(-1).numpy()  # [14400]
+    ppg_continuous = ppg_windows.reshape(-1).numpy()  # [14400]
     resp_continuous = resp_windows.reshape(-1).numpy()  # [14400]
 
-    # Calculate respiratory rate using FFT
-    rr_pred = calculate_respiratory_rate_fft(pred_continuous, fs=SAMPLING_RATE)
-    rr_true = calculate_respiratory_rate_fft(resp_continuous, fs=SAMPLING_RATE)
+    # ========================================================================
+    # Step 2: Sliding Window Inference with Overlap-Add
+    # ========================================================================
+    # Strategy: Create overlapping windows from continuous signal, run model
+    # on each window, then merge predictions using weighted averaging.
+    # This eliminates boundary artifacts that occur with simple concatenation.
+    #
+    # Parameters (matching LOSO evaluation):
+    # - window_size: 288 samples (9.6s at 30Hz)
+    # - stride: 30 samples (1s at 30Hz) → 89.6% overlap
+    # - Result: ~471 overlapping windows from 14400 samples
+    #
+    # Benefits:
+    # - Smooth continuous output (no stitching artifacts)
+    # - Each sample averaged across ~9 predictions
+    # - Matches methodology used in CapnoBase LOSO evaluation
 
-    # Calculate absolute error
-    rr_error = abs(rr_pred - rr_true)
+    pred_continuous = sliding_window_inference(
+        model=model,
+        ppg_signal=ppg_continuous,
+        device=device,
+        window_size=WINDOW_SIZE,
+        stride=STRIDE,
+        batch_size=BATCH_SIZE
+    )
+
+    # ========================================================================
+    # Step 3: Dual Metric Calculation (30.6s and 60.6s Windows)
+    # ========================================================================
+    # Paper methodology: Evaluate RR accuracy on two window sizes
+    # - Short window (30.6s / 918 samples): Captures short-term RR variations
+    # - Long window (60.6s / 1818 samples): Provides more stable RR estimates
+    # Both windows use non-overlapping segmentation with linear detrending
+
+    mae_30s = compute_windowed_mae(pred_continuous, resp_continuous, SAMPLES_SHORT)
+    mae_60s = compute_windowed_mae(pred_continuous, resp_continuous, SAMPLES_LONG)
 
     # Format subject_id as zero-padded string: "01", "02", ..., "53"
     subject_id_str = f"{subject_idx + 1:02d}"
 
     return {
         'subject_id': subject_id_str,
-        'rr_true': rr_true,
-        'rr_pred': rr_pred,
-        'rr_error': rr_error
+        'mae_30s': mae_30s,
+        'mae_60s': mae_60s
     }
 
 
@@ -350,12 +438,21 @@ def print_summary(all_results, total_time):
     print(f"Subjects Evaluated:  {len(all_results)}")
     print(f"Evaluation Time:     {total_time:.2f} seconds ({total_time/60:.2f} minutes)")
     print()
-    print("Respiratory Rate Error Statistics:")
-    print(f"  Mean (MAE):  {df['rr_error'].mean():.2f} BPM")
-    print(f"  Std Dev:     {df['rr_error'].std():.2f} BPM")
-    print(f"  Median:      {df['rr_error'].median():.2f} BPM")
-    print(f"  Min:         {df['rr_error'].min():.2f} BPM")
-    print(f"  Max:         {df['rr_error'].max():.2f} BPM")
+    print("Evaluation Window Statistics:")
+    print()
+    print("30.6-second Windows (918 samples):")
+    print(f"  Mean MAE:    {df['mae_30s'].mean():.2f} BPM")
+    print(f"  Median MAE:  {df['mae_30s'].median():.2f} BPM")
+    print(f"  Std Dev:     {df['mae_30s'].std():.2f} BPM")
+    print(f"  Min:         {df['mae_30s'].min():.2f} BPM")
+    print(f"  Max:         {df['mae_30s'].max():.2f} BPM")
+    print()
+    print("60.6-second Windows (1818 samples):")
+    print(f"  Mean MAE:    {df['mae_60s'].mean():.2f} BPM")
+    print(f"  Median MAE:  {df['mae_60s'].median():.2f} BPM")
+    print(f"  Std Dev:     {df['mae_60s'].std():.2f} BPM")
+    print(f"  Min:         {df['mae_60s'].min():.2f} BPM")
+    print(f"  Max:         {df['mae_60s'].max():.2f} BPM")
     print("=" * 80)
     print()
 
@@ -365,6 +462,7 @@ def print_summary(all_results, total_time):
 # ============================================================================
 
 if __name__ == "__main__":
+    os.chdir(ROOT)
     try:
         results = run_zeroshot_evaluation()
         print("Zero-shot evaluation completed successfully!")

@@ -5,6 +5,13 @@ This script implements the complete training pipeline for the Deep Corr-Encoder 
 including data loading, training loop, validation, logging, and visualization.
 """
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import os
 import random
 import time
@@ -15,7 +22,7 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from utils import CorrEncoder, count_parameters
+from core_model.utils import CorrEncoder, count_parameters
 
 
 # ============================================================================
@@ -415,4 +422,5 @@ def main():
 
 
 if __name__ == "__main__":
+    os.chdir(ROOT)
     main()

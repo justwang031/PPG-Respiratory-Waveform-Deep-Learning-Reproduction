@@ -5,6 +5,13 @@ This module implements the 1D Convolutional Autoencoder architecture
 for PPG to CO2 signal reconstruction as described in the Deep Corr-Encoder paper.
 """
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import torch
 import torch.nn as nn
 

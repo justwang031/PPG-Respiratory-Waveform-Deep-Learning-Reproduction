@@ -7,13 +7,19 @@ including waveform visualization and respiratory rate distribution analysis.
 Author: Zhantao Wang
 """
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.signal import find_peaks
-from pathlib import Path
 from tqdm import tqdm
 import random
 
@@ -286,6 +292,8 @@ class DatasetEDA:
 
 
 if __name__ == "__main__":
+    os.chdir(ROOT)
+
     # Initialize EDA analyzer
     eda = DatasetEDA(
         processed_data_dir='processed_data',

@@ -9,10 +9,17 @@ This script scans all raw signal CSV files and checks for:
 - Inf (Infinity) values in PPG and Capnography columns
 """
 
+import sys
+from pathlib import Path
+import os
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import pandas as pd
 import numpy as np
 from glob import glob
-from pathlib import Path
 from tqdm import tqdm
 
 
@@ -64,6 +71,8 @@ def main():
     """
     Main execution: scan all raw signal files and report integrity status.
     """
+    os.chdir(ROOT)
+
     # Define the raw data directory and file pattern
     raw_data_dir = Path('raw_data')
     file_pattern = '*_signal.csv'

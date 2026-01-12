@@ -9,9 +9,15 @@ Generates three publication-quality figures from Deep Corr-Encoder LOSO CV resul
 Author: Zhantao Wang
 """
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import os
 import warnings
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -22,9 +28,9 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 # Import from existing codebase
-from utils import CorrEncoder
-from preprocess import CapnoBasePreprocessor
-from loso_eval import (
+from core_model.utils import CorrEncoder
+from preprocessing.preprocess import CapnoBasePreprocessor
+from evaluation.loso_eval import (
     sliding_window_inference,
     calculate_respiratory_rate_fft,
     get_device
@@ -464,6 +470,85 @@ def generate_figure_c_scatter(df, preprocessor, device, output_path):
     print(f"  Saved: {output_path}")
 
 
+def generate_updated_csv_structure():
+    """Generate corrected results CSV with updated RR error using 0.1 Hz FFT threshold.
+
+    This function:
+    1. Loads the original CSV with results from 42-fold CV
+    2. Re-runs inference for each fold
+    3. Recalculates RR error using updated FFT logic (0.1 Hz threshold)
+    4. Updates the DataFrame in-place (preserving all other columns)
+    5. Saves corrected results to a new CSV file
+    """
+    print("=" * 80)
+    print("Generating Updated CSV with Corrected RR Error")
+    print("=" * 80)
+    print()
+
+    # Load original CSV
+    csv_path = os.path.join(LOSO_RESULTS_DIR, 'all_fold_results.csv')
+    df = pd.read_csv(csv_path)
+    print(f"Loaded original CSV with {len(df)} folds")
+
+    # Calculate old mean RR error
+    old_mean_rr_error = df['rr_error_bpm'].mean()
+    print(f"Old Mean RR Error: {old_mean_rr_error:.2f} BPM")
+    print()
+
+    # Setup device and preprocessor
+    device = get_device()
+    preprocessor = CapnoBasePreprocessor(RAW_DATA_DIR, 'processed_data')
+
+    # Iterate through all 42 folds
+    print("Recalculating RR error for all folds...")
+    for fold_idx in tqdm(range(42), desc="Processing folds"):
+        try:
+            # Run inference for this fold
+            result = run_fold_inference(fold_idx, df, preprocessor, device)
+
+            if result is None:
+                warnings.warn(f"Skipping fold {fold_idx} due to inference failure")
+                continue
+
+            # Calculate True RR and Predicted RR using updated FFT logic (0.1 Hz threshold)
+            rr_true = calculate_respiratory_rate_fft(result['ground_truth'], fs=SAMPLING_RATE)
+            rr_pred = calculate_respiratory_rate_fft(result['prediction'], fs=SAMPLING_RATE)
+
+            # Compute new absolute error
+            new_error = abs(rr_pred - rr_true)
+
+            # Update DataFrame in-place for this specific row
+            # CRITICAL: This preserves all other columns (duty_cycle_error, best_epoch, etc.)
+            df.loc[df['fold'] == fold_idx, 'rr_error_bpm'] = new_error
+
+            # Memory cleanup
+            del result
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+        except Exception as e:
+            warnings.warn(f"Failed to process fold {fold_idx}: {str(e)}")
+            continue
+
+    # Calculate new mean RR error
+    new_mean_rr_error = df['rr_error_bpm'].mean()
+
+    # Save updated DataFrame to new CSV
+    output_path = os.path.join(LOSO_RESULTS_DIR, 'all_fold_results_new.csv')
+    df.to_csv(output_path, index=False)
+
+    print()
+    print("=" * 80)
+    print("Results Comparison")
+    print("=" * 80)
+    print(f"Old Mean RR Error: {old_mean_rr_error:.2f} BPM")
+    print(f"New Mean RR Error: {new_mean_rr_error:.2f} BPM")
+    print(f"Difference: {abs(new_mean_rr_error - old_mean_rr_error):.2f} BPM")
+    print()
+    print(f"Updated CSV saved to: {output_path}")
+    print("=" * 80)
+
+
 # ============================================================================
 # Main Orchestration
 # ============================================================================
@@ -490,6 +575,11 @@ def main():
     # Setup device
     device = get_device()
     print(f"Using device: {device}")
+    print()
+
+    # Generate Updated CSV with Corrected RR Error (0.1 Hz threshold)
+    print("Step 1: Generating Updated CSV with Corrected RR Error...")
+    generate_updated_csv_structure()
     print()
 
     # Load results CSV
@@ -529,4 +619,5 @@ def main():
 
 
 if __name__ == "__main__":
+    os.chdir(ROOT)
     main()

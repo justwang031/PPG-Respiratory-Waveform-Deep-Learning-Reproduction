@@ -1,3 +1,20 @@
+# Checkpoints and model weights
+*.pth
+
+# Results and generated artifacts
+loso_results/
+pls_results/
+*_results/
+
+# Images / figures
+debug_*.png
+loss_curve.png
+prediction_gallery.png
+*.png
+
+# Python cache
+__pycache__/
+*.pyc
 # Python-generated files
 __pycache__/
 *.py[oc]

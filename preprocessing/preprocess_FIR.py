@@ -1,10 +1,12 @@
 """
-CapnoBase Dataset Preprocessing Script for Deep Corr-Encoder
+CapnoBase Dataset Preprocessing Script for Deep Corr-Encoder (FIR Filter Version)
 
 This script processes raw CapnoBase physiological signals for deep learning.
 It performs resampling, filtering, normalization, and segmentation.
+Uses FIR (Finite Impulse Response) filter for improved phase linearity.
 
 Author: Zhantao Wang
+Modified: FIR filter implementation for high-pass filtering
 """
 
 import os
@@ -14,6 +16,11 @@ import numpy as np
 import torch
 from scipy import signal
 from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 class CapnoBasePreprocessor:
@@ -99,26 +106,37 @@ class CapnoBasePreprocessor:
 
         return resampled
 
-    def apply_highpass_filter(self, data, fs, cutoff=0.05, order=2):
+    def apply_highpass_filter(self, data, fs, cutoff=0.05, numtaps=1001):
         """
-        Apply 2nd-order Butterworth high-pass filter to remove DC baseline wander.
+        Apply FIR high-pass filter to remove DC baseline wander.
+
+        Uses FIR filter for improved phase linearity and waveform morphology
+        preservation compared to IIR (Butterworth) filters.
 
         Args:
             data: Input signal
-            fs: Sampling rate
-            cutoff: Cutoff frequency in Hz
-            order: Filter order
+            fs: Sampling rate (Hz)
+            cutoff: Cutoff frequency in Hz (default: 0.05 Hz)
+            numtaps: Filter length (must be odd, default: 1001)
+                    Large value needed for low cutoff relative to sampling rate
 
         Returns:
             Filtered signal
         """
-        # Design Butterworth high-pass filter
-        nyquist = fs / 2
-        normalized_cutoff = cutoff / nyquist
-        b, a = signal.butter(order, normalized_cutoff, btype='high', analog=False)
+        # Design FIR high-pass filter using windowed method
+        # pass_zero=False creates a high-pass filter
+        # Window method provides good frequency response for our application
+        fir_coeff = signal.firwin(
+            numtaps=numtaps,
+            cutoff=cutoff,
+            fs=fs,
+            pass_zero=False,  # High-pass filter
+            window='hamming'
+        )
 
-        # Apply filter
-        filtered = signal.filtfilt(b, a, data)
+        # Apply filter using filtfilt for zero-phase distortion
+        # This ensures peaks align correctly with ground truth
+        filtered = signal.filtfilt(fir_coeff, 1.0, data)
 
         return filtered
 
@@ -194,8 +212,8 @@ class CapnoBasePreprocessor:
         ppg_resampled = self.resample_signal(ppg, original_fs, self.target_fs)
         co2_resampled = self.resample_signal(co2, original_fs, self.target_fs)
 
-        # Apply high-pass filter to PPG only
-        ppg_filtered = self.apply_highpass_filter(ppg_resampled, self.target_fs, cutoff=0.05, order=2)
+        # Apply high-pass FIR filter to PPG only
+        ppg_filtered = self.apply_highpass_filter(ppg_resampled, self.target_fs, cutoff=0.05, numtaps=1001)
 
         # Normalize signals
         ppg_normalized = self.normalize_signal(ppg_filtered, -1, 1)  # PPG to [-1, 1]
@@ -213,7 +231,7 @@ class CapnoBasePreprocessor:
         Process entire dataset and save to .pt files.
         """
         print("=" * 60)
-        print("CapnoBase Dataset Preprocessing")
+        print("CapnoBase Dataset Preprocessing (FIR Filter)")
         print("=" * 60)
 
         # Discover all subjects
@@ -288,6 +306,8 @@ class CapnoBasePreprocessor:
 
 
 if __name__ == "__main__":
+    os.chdir(ROOT)
+
     # Initialize preprocessor
     preprocessor = CapnoBasePreprocessor(
         raw_data_dir='raw_data',

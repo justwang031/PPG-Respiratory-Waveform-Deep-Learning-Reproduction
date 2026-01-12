@@ -14,6 +14,13 @@ Each scenario displays two metrics:
 Author: Zhantao Wang
 """
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import os
 import gc
 import pickle
@@ -30,8 +37,8 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 # Local imports
-from utils import CorrEncoder
-from loso_eval import (
+from core_model.utils import CorrEncoder
+from evaluation.loso_eval import (
     seed_everything,
     get_device,
     sliding_window_inference
@@ -793,4 +800,5 @@ def main():
 # ============================================================================
 
 if __name__ == "__main__":
+    os.chdir(ROOT)
     exit(main())

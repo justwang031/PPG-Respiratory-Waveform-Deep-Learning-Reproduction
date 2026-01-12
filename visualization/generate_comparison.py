@@ -13,13 +13,22 @@ Output:
     - pls_results/waveform_mae_comparison.png
 """
 
+import sys
+from pathlib import Path
+import os
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path
 
 
 def main():
+    os.chdir(ROOT)
+
     # File paths
     dl_results_path = "loso_results/all_fold_results.csv"
     pls_results_path = "pls_results/pls_all_fold_results.csv"

@@ -11,6 +11,13 @@ Implements 42-fold LOSO CV with:
 Author: Zhantao Wang
 """
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import os
 import gc
 import json
@@ -18,7 +25,6 @@ import random
 import time
 import traceback
 from datetime import datetime
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -31,8 +37,8 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from scipy import signal
 
-from utils import CorrEncoder, count_parameters
-from preprocess import CapnoBasePreprocessor
+from core_model.utils import CorrEncoder, count_parameters
+from preprocessing.preprocess import CapnoBasePreprocessor
 
 
 # ============================================================================
@@ -195,7 +201,7 @@ def calculate_respiratory_rate_fft(co2_signal, fs=30):
     Method:
     1. Remove DC component (subtract mean)
     2. Compute FFT and magnitude spectrum
-    3. Restrict to physiological range: 0.1-0.7 Hz (6-42 BPM)
+    3. Restrict to physiological range: 0.05-0.7 Hz (3-42 BPM)
     4. Find peak frequency
     5. Convert to BPM: peak_freq * 60
 
@@ -215,9 +221,9 @@ def calculate_respiratory_rate_fft(co2_signal, fs=30):
     fft_mag = np.abs(fft_vals[:n//2])  # Positive frequencies only
     freqs = np.fft.fftfreq(n, d=1/fs)[:n//2]
 
-    # Restrict to physiological range: 0.1-0.7 Hz (6-42 BPM)
-    # Lower bound 0.1 Hz filters out DC component and very low frequencies
-    mask = (freqs >= 0.1) & (freqs <= 0.7)
+    # Restrict to physiological range: 0.05-0.7 Hz (3-42 BPM)
+    # Lower bound 0.05 Hz filters out DC component and very low frequencies
+    mask = (freqs >= 0.05) & (freqs <= 0.7)
     valid_fft = fft_mag[mask]
     valid_freqs = freqs[mask]
 
@@ -770,4 +776,5 @@ def run_loso_cross_validation():
 # ============================================================================
 
 if __name__ == "__main__":
+    os.chdir(ROOT)
     results = run_loso_cross_validation()

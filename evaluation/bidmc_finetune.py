@@ -20,6 +20,13 @@ Evaluation metrics: Respiratory rate MAE on 30.6s and 60.6s windows
 Author: Zhantao Wang
 """
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import os
 import gc
 import time
@@ -33,8 +40,8 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 
-from utils import CorrEncoder, count_parameters
-from loso_eval import calculate_respiratory_rate_fft, seed_everything, get_device, sliding_window_inference
+from core_model.utils import CorrEncoder, count_parameters
+from evaluation.loso_eval import calculate_respiratory_rate_fft, seed_everything, get_device, sliding_window_inference
 
 
 # ============================================================================
@@ -500,6 +507,7 @@ def print_summary(all_results, total_time):
 # ============================================================================
 
 if __name__ == "__main__":
+    os.chdir(ROOT)
     try:
         results = run_finetune_loso()
         print("Fine-tuning evaluation completed successfully!")

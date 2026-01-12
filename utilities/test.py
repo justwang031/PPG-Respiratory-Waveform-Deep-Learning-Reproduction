@@ -1,6 +1,16 @@
+import sys
+from pathlib import Path
+import os
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import torch
 import matplotlib.pyplot as plt
-from utils import CorrEncoder
+from core_model.utils import CorrEncoder
+
+os.chdir(ROOT)
 
 # Load data and model
 data = torch.load('processed_data_bidmc/bidmc_all.pt')
