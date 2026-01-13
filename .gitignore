@@ -67,3 +67,5 @@ bidmc_results/**
 !pls_results/aggregated_results.json
 !bidmc_results/*.csv
 
+# PDF
+breathingDectection.pdf
