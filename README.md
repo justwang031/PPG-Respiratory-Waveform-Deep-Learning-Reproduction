@@ -101,7 +101,7 @@ uv pip install -e .
 ### 4. Verify Installation
 
 ```bash
-python utils.py
+python core_model/utils.py
 # Expected output: "All tests passed! Model is ready for training."
 ```
 
@@ -127,7 +127,7 @@ raw_data/
 
 **Preprocessing**:
 ```bash
-python preprocess.py
+python preprocessing/preprocess.py
 ```
 
 **Output**:
@@ -158,7 +158,7 @@ raw_data_bidmc/
 
 **Preprocessing**:
 ```bash
-python preprocess_bidmc.py
+python preprocessing/preprocess_bidmc.py
 ```
 
 **Output**:
@@ -173,7 +173,7 @@ python preprocess_bidmc.py
 Train a single model on 39 subjects (validate on 3 subjects):
 
 ```bash
-python train.py
+python training/train.py
 ```
 
 **Configuration** (from `train.py`):
@@ -197,7 +197,7 @@ python train.py
 Train on all 42 CapnoBase subjects (for transfer learning pre-training):
 
 ```bash
-python train_master_model.py
+python training/train_master_model.py
 ```
 
 **Output**: `capnobase_master.pth`
@@ -209,7 +209,7 @@ python train_master_model.py
 Run 42-fold Leave-One-Subject-Out cross-validation:
 
 ```bash
-python loso_eval.py
+python evaluation/loso_eval.py
 ```
 
 **Configuration** (from `loso_eval.py`):
@@ -245,7 +245,7 @@ ls loso_results/fold_*/metrics.json | wc -l
 Run PLS regression baseline with same LOSO splits:
 
 ```bash
-python run_pls_baseline.py
+python evaluation/run_pls_baseline.py
 ```
 
 **Configuration**:
@@ -262,7 +262,7 @@ python run_pls_baseline.py
 
 **Zero-Shot Transfer** (no fine-tuning):
 ```bash
-python bidmc_zeroshot.py
+python evaluation/bidmc_zeroshot.py
 ```
 
 Loads CapnoBase-trained model and directly evaluates on BIDMC (PPG → RESP).
@@ -271,7 +271,7 @@ Loads CapnoBase-trained model and directly evaluates on BIDMC (PPG → RESP).
 
 **Fine-Tuning Transfer**:
 ```bash
-python bidmc_finetune.py
+python evaluation/bidmc_finetune.py
 ```
 
 53-fold LOSO on BIDMC, starting from CapnoBase pre-trained weights.
@@ -290,15 +290,15 @@ python bidmc_finetune.py
 
 ```bash
 # LOSO results visualization
-python generate_paper_plots.py
+python visualization/generate_paper_plots.py
 # Output: paper_plots/ (3-panel figures)
 
 # Deep Learning vs PLS comparison
-python generate_comparison.py
+python visualization/generate_comparison.py
 # Output: Comparison plots
 
 # BIDMC transfer learning figures
-python generate_bidmc_figure4a.py
+python visualization/generate_bidmc_figure4a.py
 # Output: bidmc_plots/
 ```
 
@@ -308,19 +308,19 @@ python generate_bidmc_figure4a.py
 
 ```
 Paper_Reproduction/
-├── Core Model
+├── core_model/
 │   └── utils.py                    # CorrEncoder architecture (18,441 params)
 │
-├── Preprocessing
+├── preprocessing/
 │   ├── preprocess.py               # CapnoBase preprocessing
 │   ├── preprocess_bidmc.py         # BIDMC preprocessing
 │   └── preprocess_FIR.py           # Alternative FIR filter
 │
-├── Training
+├── training/
 │   ├── train.py                    # Single model (39/3 split)
 │   └── train_master_model.py       # All 42 subjects
 │
-├── Evaluation
+├── evaluation/
 │   ├── loso_eval.py                # 42-fold LOSO cross-validation
 │   ├── loso_eval_v1_baseline.py    # Alternative baseline evaluation
 │   ├── run_pls_baseline.py         # PLS regression baseline
@@ -328,14 +328,14 @@ Paper_Reproduction/
 │   ├── bidmc_zeroshot_v1.py        # Alternative zero-shot version
 │   └── bidmc_finetune.py           # Fine-tuning transfer
 │
-├── Visualization
+├── visualization/
 │   ├── visualize.py                # Prediction gallery
 │   ├── generate_paper_plots.py     # LOSO results figures
 │   ├── generate_paper_plots_v1.py  # Alternative plotting version
 │   ├── generate_comparison.py      # DL vs PLS comparison
 │   └── generate_bidmc_figure4a.py  # BIDMC transfer figures
 │
-├── Utilities
+├── utilities/
 │   ├── eda.py                      # Exploratory data analysis
 │   ├── check_nans.py               # Data validation
 │   └── test.py                     # Testing utilities
