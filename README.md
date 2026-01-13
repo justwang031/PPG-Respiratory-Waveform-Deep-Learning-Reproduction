@@ -614,7 +614,7 @@ NUM_EPOCHS = 80          # Training epochs per fold
 Generate prediction gallery with sample predictions:
 
 ```bash
-python visualize.py
+python visualization/visualize.py
 ```
 
 **Output**: `prediction_gallery.png`
