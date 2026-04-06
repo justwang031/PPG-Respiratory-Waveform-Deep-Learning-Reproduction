@@ -621,32 +621,15 @@ python visualization/visualize.py
 
 ---
 
-## Citation
+## Reference
 
-If you use this code or reproduce this work, please cite:
+This project reproduces the methodology from:
 
-```bibtex
-@article{deep_corr_encoder,
-  title={Deep Corr-Encoder: [Full Title]},
-  author={[Authors]},
-  journal={[Journal]},
-  year={[Year]},
-  doi={[DOI]}
-}
-```
+> Davies, H.J. and Mandic, D.P. (2023). "Rapid extraction of respiratory waveforms from photoplethysmography: A deep corr-encoder approach." *Biomedical Signal Processing and Control*, 85, 104992. [DOI: 10.1016/j.bspc.2023.104992](https://doi.org/10.1016/j.bspc.2023.104992)
 
-**Dataset Citations**:
+**Dataset**: 
 
-CapnoBase:
-```bibtex
-@data{capnobase,
-  author = {CapnoBase Contributors},
-  title = {CapnoBase Dataset},
-  year = {2023},
-  doi = {10.5683/SP2/NLB8IT},
-  url = {https://doi.org/10.5683/SP2/NLB8IT}
-}
-```
+CapnoBase Respiratory Benchmark — [DOI: 10.5683/SP2/NLB8IT](https://doi.org/10.5683/SP2/NLB8IT)
 
 BIDMC: Obtain from official dataset source
 
