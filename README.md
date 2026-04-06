@@ -675,7 +675,7 @@ This reproduction is provided for **academic and research purposes**.
 
 ## Contributing
 
-**Author**: Zhantao Wang
+**Author**: Justin Wang
 
 **Pull Requests Welcome** for:
 - Bug fixes
