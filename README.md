@@ -660,7 +660,7 @@ This reproduction is provided for **academic and research purposes**.
 - CapnoBase: See [DOI:10.5683/SP2/NLB8IT](https://doi.org/10.5683/SP2/NLB8IT) for license terms
 - BIDMC: See official source for license terms
 
-**Code License**: [To be specified - MIT/Apache 2.0/etc.]
+**Code License**: MIT
 
 ---
 
